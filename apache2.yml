@@ -5,6 +5,8 @@
   vars:
     apache_deb: apache2
     apache_red: httpd
+    user_name: user #kasutajanimi
+    public_html_dir: "/home/{{ user_name }}/public_html"
 
   tasks:
     - name: Paigaldame apache2 teenuse Debian masinatele
@@ -22,6 +24,14 @@
         update_cache: yes
       when:
         - ansible_os_family == "RedHat"
+
+    - name: Loome public_html kausta kasutajale user
+      file:
+        path: "{{ public_html_dir }}"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: 0755
+        state: directory
 
     - name: Enable'ime ja käivitame apache2 teenuse
       service:
