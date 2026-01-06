@@ -53,19 +53,19 @@
 #        state: present
 #      when: ansible_os_family == "RedHat"
 
-    - name: Enable UserDir for tecmint
+    - name: Comment UserDir disabled line
       lineinfile:
         path: /etc/httpd/conf.d/userdir.conf
-        regexp: '^UserDir\s+disabled'
-        line: 'UserDir enabled tecmint'
+        regexp: '^\s*UserDir\s+disabled'
+        line: "{{ '    ' }}{{ '#' }}{{ 'UserDir disabled' }}"
       when:
         - ansible_os_family == "RedHat"
 
     - name: Uncomment UserDir public_html
       lineinfile:
         path: /etc/httpd/conf.d/userdir.conf
-        regexp: '^#UserDir\s+public_html'
-        line: 'UserDir public_html'
+        regexp: '^\s*#UserDir\s+public_html'
+        line: '    UserDir public_html'
       when:
         - ansible_os_family == "RedHat"
 
