@@ -160,6 +160,31 @@
       when:
         - ansible_os_family == "RedHat"
 
+####################Iseseisev osa###########################
+
+    - name: Loo unikaalne index.html fail kasutaja kodukausta
+      copy:
+        dest: "/home/{{ user_name }}/public_html/index.html"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0644'
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Apache UserDir Test Page</title>
+          </head>
+          <body>
+            <h1>Tere tulemast Apache UserDir kataloogi!</h1>
+
+            <p><strong>Hostname:</strong> {{ ansible_hostname }}</p>
+            <p><strong>IP-aadress:</strong> {{ ansible_default_ipv4.address }}</p>
+            <p><strong>OS:</strong> {{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+
+            <p>See leht on loodud Ansible playbooki abil.</p>
+          </body>
+          </html>
+
 ############################################################
 
     - name: Teeme apache2/http teenusele restardi
