@@ -26,6 +26,22 @@
       when:
         - ansible_os_family == "RedHat"
 
+    - name: Lubame apache2/http teenuse ja käivitame selle
+      service:
+        name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
+        state: started
+        enabled: yes
+
+    - name: Avame HTTP pordi CentOS masina tulemüüris
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+        immediate: yes
+        zone: public
+      when:
+        - ansible_os_family == "RedHat"
+
 ####################Ülesanne2###############################
 
     - name: Loome public_html kausta kasutajale user
@@ -35,6 +51,14 @@
         group: "{{ user_name }}"
         mode: 0755
         state: directory
+
+    - name: Anname kodukaustale vajalikud õigused
+      file:
+        path: "/home/{{ user_name }}"
+        state: directory
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0711'
 
 ####################Ülesanne3###############################
 
@@ -53,7 +77,7 @@
 #        state: present
 #      when: ansible_os_family == "RedHat"
 
-    - name: Comment UserDir disabled line
+    - name: Kommenteerime kinni UserDir disabled rea
       lineinfile:
         path: /etc/httpd/conf.d/userdir.conf
         regexp: '^\s*UserDir\s+disabled'
@@ -61,7 +85,7 @@
       when:
         - ansible_os_family == "RedHat"
 
-    - name: Uncomment UserDir public_html
+    - name: Kommenteerime lahti UserDir public_html rea
       lineinfile:
         path: /etc/httpd/conf.d/userdir.conf
         regexp: '^\s*#UserDir\s+public_html'
@@ -69,11 +93,55 @@
       when:
         - ansible_os_family == "RedHat"
 
-####################Ülesanne4###############################
+############################################################
 
-    - name: Enable'ime ja käivitame apache2 teenuse
+    - name: Teeme apache2/http teenusele restardi
       service:
         name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
-        state: started
-        enabled: yes
+        state: restarted
+
+####################Ülesanne5###############################
+
+    - name: Kopeerime index.html faili kasutaja user public_html kausta
+      copy:
+        src: /var/www/html/index.html
+        dest: "{{ public_html_dir }}"
+        remote_src: yes
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0644'
+      when:
+        - ansible_os_family == "Debian"
+
+    - name: Loome index.html faili public_html kausta
+      copy:
+        dest: "/home/{{ user_name }}/public_html/index.html"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0644'
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Welcome to Apache on CentOS!</title>
+          </head>
+          <body>
+            <h1>It works!</h1>
+            <p>This is a test page in /home/{{ user_name }}/public_html.</p>
+          </body>
+          </html>
+      when:
+        - ansible_os_family == "RedHat"
+
+    - name: Lubab Apache teenuse läbi SELinux turvakihi CentOS masinas
+      command: setsebool -P httpd_enable_homedirs on
+      when:
+        -  ansible_os_family == "RedHat"
+
+############################################################
+
+    - name: Teeme apache2/http teenusele restardi
+      service:
+        name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
+        state: restarted
 
