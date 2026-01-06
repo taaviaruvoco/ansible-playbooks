@@ -126,7 +126,9 @@
             <title>Welcome to Apache on CentOS!</title>
           </head>
           <body>
-            <h1>It works!</h1>
+            <h1>
+              It works!
+            </h1>
             <p>This is a test page in /home/{{ user_name }}/public_html.</p>
           </body>
           </html>
@@ -137,6 +139,26 @@
       command: setsebool -P httpd_enable_homedirs on
       when:
         -  ansible_os_family == "RedHat"
+
+####################Ülesanne6###############################
+
+    - name: Muuda rida index.html failis Debian masinas
+      lineinfile:
+        dest: "/home/{{ user_name }}/public_html/index.html"
+        regexp: "Apache2 Debian Default Page"
+        line: "{{ user_name}}-i lehekülg"
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+
+    - name: Muuda rida index.html failis CentOS masinas
+      lineinfile:
+        dest: "/home/{{ user_name }}/public_html/index.html"
+        regexp: "It works!"
+        line: "{{ user_name}}-i lehekülg"
+        state: present
+      when:
+        - ansible_os_family == "RedHat"
 
 ############################################################
 
