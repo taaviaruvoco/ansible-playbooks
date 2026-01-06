@@ -1,0 +1,31 @@
+
+---
+- name: Apache või HTTP teenuse paigaldamine klientmasinas
+  hosts: webservers
+  vars:
+    apache_deb: apache2
+    apache_red: httpd
+
+  tasks:
+    - name: Paigaldame apache2 teenuse Debian masinatele
+      package:
+        name: "{{ apache_deb }}"
+        state: latest
+        update_cache: yes
+      when:
+        - ansible_os_family == "Debian"
+
+    - name: Paigaldame http teenuse RedHat masinatele
+      package:
+        name: "{{ apache_red }}"
+        state: latest
+        update_cache: yes
+      when:
+        - ansible_os_family == "RedHat"
+
+    - name: Enable'ime ja käivitame apache2 teenuse
+      service:
+        name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
+        state: started
+        enabled: yes
+
