@@ -1,21 +1,28 @@
 
+#Apache (Debian) ja HTTP (CentOS) teenuse kliendiserveritele paigaldamise Ansible playbook.
+#Osad kasutatavad käsud on mõlemal süsteemil samad, osad sammud on Debiani ja CentOS
+#operatsioonisüsteemidel erinevad ning selle jaoks kontrollitakse mõnedes sammudes,
+#mis masinaga täpsemalt tegu on, ja kasutatakse vastavalt sellele õigeid käske.
+
 ---
-- name: Apache või HTTP teenuse paigaldamine klientmasinas
+- name: Apache või HTTP teenuse paigaldamine klientmasinasse
   hosts: webservers
   vars:
-    apache_deb: apache2
-    apache_red: httpd
+    apache_deb: apache2 #kasutatakse Debiani masina puhul
+    apache_red: httpd #kasutatakse CentOS masina puhul
     user_name: user #kasutajanimi
     public_html_dir: "/home/{{ user_name }}/public_html" #puclic_html kausta asukoht kasutaja kodukaustas
 
   tasks:
+
 ####################Ülesanne1################################
+
     - name: Paigaldame apache2 teenuse Debian masinatele
       package:
         name: "{{ apache_deb }}"
-        state: latest
+        state: latest #võtab kõige uusima versiooni
         update_cache: yes
-      when:
+      when: #kontrollib, et tegemist on Debian masinaga
         - ansible_os_family == "Debian"
 
     - name: Paigaldame http teenuse RedHat masinatele
@@ -23,19 +30,19 @@
         name: "{{ apache_red }}"
         state: latest
         update_cache: yes
-      when:
+      when: #kontrollib et tegemist on CentOS masinaga
         - ansible_os_family == "RedHat"
 
     - name: Lubame apache2/http teenuse ja käivitame selle
       service:
         name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
-        state: started
-        enabled: yes
+        state: started #käivitab teenuse
+        enabled: yes #lubab teenuse (masina taaskäivitamisel jääb aktiivseks)
 
-    - name: Avame HTTP pordi CentOS masina tulemüüris
+    - name: Avame HTTP pordi CentOS masina tulemüüris #vaikimisi ei ole CentOSis port 80 avatud ning see tuleb ise avada
       firewalld:
         service: http
-        permanent: yes
+        permanent: yes  #et jääks pärast taaskäivitust ikka avatuks
         state: enabled
         immediate: yes
         zone: public
@@ -44,7 +51,7 @@
 
 ####################Ülesanne2###############################
 
-    - name: Loome public_html kausta kasutajale user
+    - name: Loome public_html kausta kasutaja user kodukausta ja anname vastavad õigused
       file:
         path: "{{ public_html_dir }}"
         owner: "{{ user_name }}"
@@ -52,7 +59,7 @@
         mode: 0755
         state: directory
 
-    - name: Anname kodukaustale vajalikud õigused
+    - name: Anname kasutaja kodukaustale vajalikud õigused
       file:
         path: "/home/{{ user_name }}"
         state: directory
@@ -62,36 +69,40 @@
 
 ####################Ülesanne3###############################
 
-    - name: Lubame userdir mode'i Debiani masinal
+    - name: Lubame UserDir mode'i Debiani masinal
       apache2_module:
         name: userdir
         state: present
       when:
         - ansible_os_family == "Debian"
 
-#    - name: Muudame CentOSil es faili sisu
-#      lineinfile:
-#        path: /etc/httpd/conf.modules.d/00-base.conf
-#        regexp: '^#LoadModule userdir_module'
-#        line: 'LoadModule userdir_module modules/mod_userdir.so'
-#        state: present
-#      when: ansible_os_family == "RedHat"
+    - name: Konfigureerime UserDir CentOS masinal
+      block:
 
-    - name: Kommenteerime kinni UserDir disabled rea
-      lineinfile:
-        path: /etc/httpd/conf.d/userdir.conf
-        regexp: '^\s*UserDir\s+disabled'
-        line: "{{ '    ' }}{{ '#' }}{{ 'UserDir disabled' }}"
-      when:
-        - ansible_os_family == "RedHat"
+#      - name: Muudame CentOSil 00-bases.conf faili sisu #tähtis punkt, kuid selle faili sisu on juba alguses selline
+#        lineinfile:
+#          path: /etc/httpd/conf.modules.d/00-base.conf
+#          regexp: '^#LoadModule userdir_module'
+#          line: 'LoadModule userdir_module modules/mod_userdir.so'
+#          state: present
 
-    - name: Kommenteerime lahti UserDir public_html rea
-      lineinfile:
-        path: /etc/httpd/conf.d/userdir.conf
-        regexp: '^\s*#UserDir\s+public_html'
-        line: '    UserDir public_html'
+        - name: Kommenteerime kinni UserDir disabled rea CentOS masinal
+          lineinfile:
+            path: /etc/httpd/conf.d/userdir.conf
+            regexp: '^\s*UserDir\s+disabled'
+            line: "{{ '    ' }}{{ '#' }}{{ 'UserDir disabled' }}"
+
+        - name: Kommenteerime lahti UserDir public_html rea CentOS masinal
+          lineinfile:
+            path: /etc/httpd/conf.d/userdir.conf
+            regexp: '^\s*#UserDir\s+public_html'
+            line: '    UserDir public_html'
+
+        - name: Lubame Apache teenuse läbi SELinux turvakihi CentOS masinas
+          command: setsebool -P httpd_enable_homedirs on #kui valik on off, siis HTTP teenus ei pääse kodukausta sisse
+
       when:
-        - ansible_os_family == "RedHat"
+        -  ansible_os_family == "RedHat"
 
 ############################################################
 
@@ -102,7 +113,7 @@
 
 ####################Ülesanne5###############################
 
-    - name: Kopeerime index.html faili kasutaja user public_html kausta
+    - name: Kopeerime index.html faili kasutaja user public_html kausta Debian masinal
       copy:
         src: /var/www/html/index.html
         dest: "{{ public_html_dir }}"
@@ -113,7 +124,7 @@
       when:
         - ansible_os_family == "Debian"
 
-    - name: Loome index.html faili public_html kausta
+    - name: Loome index.html faili public_html kausta CentOS masinal #vaikimisi ei looda index.html faili, see tuleb ise luua
       copy:
         dest: "/home/{{ user_name }}/public_html/index.html"
         owner: "{{ user_name }}"
@@ -134,11 +145,6 @@
           </html>
       when:
         - ansible_os_family == "RedHat"
-
-    - name: Lubab Apache teenuse läbi SELinux turvakihi CentOS masinas
-      command: setsebool -P httpd_enable_homedirs on
-      when:
-        -  ansible_os_family == "RedHat"
 
 ####################Ülesanne6###############################
 
@@ -172,16 +178,16 @@
           <!DOCTYPE html>
           <html>
           <head>
-            <title>Apache UserDir Test Page</title>
+            <title>Apache Test Page</title>
           </head>
           <body>
-            <h1>Tere tulemast Apache UserDir kataloogi!</h1>
+            <h1>Tere tulemast Apache lehele!</h1>
 
-            <p><strong>Hostname:</strong> {{ ansible_hostname }}</p>
-            <p><strong>IP-aadress:</strong> {{ ansible_default_ipv4.address }}</p>
+            <p><strong>Hostname:</strong> {{ ansible_hostname }}</p> #lisab hostname'i lehele
+            <p><strong>IP-aadress:</strong> {{ ansible_default_ipv4.address }}</p> #lisab ip aadressi lehele
             <p><strong>OS:</strong> {{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+            #lisab lehele OSi ja selle versiooni
 
-            <p>See leht on loodud Ansible playbooki abil.</p>
           </body>
           </html>
 
@@ -191,4 +197,3 @@
       service:
         name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
         state: restarted
-
