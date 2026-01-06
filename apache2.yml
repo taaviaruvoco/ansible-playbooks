@@ -6,9 +6,10 @@
     apache_deb: apache2
     apache_red: httpd
     user_name: user #kasutajanimi
-    public_html_dir: "/home/{{ user_name }}/public_html"
+    public_html_dir: "/home/{{ user_name }}/public_html" #puclic_html kausta asukoht kasutaja kodukaustas
 
   tasks:
+####################Ülesanne1################################
     - name: Paigaldame apache2 teenuse Debian masinatele
       package:
         name: "{{ apache_deb }}"
@@ -25,6 +26,8 @@
       when:
         - ansible_os_family == "RedHat"
 
+####################Ülesanne2###############################
+
     - name: Loome public_html kausta kasutajale user
       file:
         path: "{{ public_html_dir }}"
@@ -32,6 +35,41 @@
         group: "{{ user_name }}"
         mode: 0755
         state: directory
+
+####################Ülesanne3###############################
+
+    - name: Lubame userdir mode'i Debiani masinal
+      apache2_module:
+        name: userdir
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+
+#    - name: Muudame CentOSil es faili sisu
+#      lineinfile:
+#        path: /etc/httpd/conf.modules.d/00-base.conf
+#        regexp: '^#LoadModule userdir_module'
+#        line: 'LoadModule userdir_module modules/mod_userdir.so'
+#        state: present
+#      when: ansible_os_family == "RedHat"
+
+    - name: Enable UserDir for tecmint
+      lineinfile:
+        path: /etc/httpd/conf.d/userdir.conf
+        regexp: '^UserDir\s+disabled'
+        line: 'UserDir enabled tecmint'
+      when:
+        - ansible_os_family == "RedHat"
+
+    - name: Uncomment UserDir public_html
+      lineinfile:
+        path: /etc/httpd/conf.d/userdir.conf
+        regexp: '^#UserDir\s+public_html'
+        line: 'UserDir public_html'
+      when:
+        - ansible_os_family == "RedHat"
+
+####################Ülesanne4###############################
 
     - name: Enable'ime ja käivitame apache2 teenuse
       service:
