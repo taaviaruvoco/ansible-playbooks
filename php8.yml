@@ -15,17 +15,24 @@
         - php
         - php-cli
         - php-fpm
+    apache_deb: apache2 #kasutatakse Debiani masina puhul
+    apache_red: httpd #kasutatakse CentOS masina puhul
+    user_name: user
     remi_repo_url: "https://rpms.remirepo.net/enterprise/remi-release-9.rpm" #Remi repo aadress
 
   tasks:
-    #Uuendame süsteemi kõigepealt
-    - name: Uuenda Debiani masinatel kõik pakettid
+
+############################################################
+
+#####Uuendame masinad
+
+    - name: Uuenda Debiani masinatel kõik paketid
       apt:
         update_cache: yes
         upgrade: dist
       when: ansible_os_family == "Debian"
 
-    - name: Uuenda CentOS masinatel kõik pakettid
+    - name: Uuenda CentOS masinatel kõik paketid
       dnf:
         name: '*'
         state: latest
@@ -37,41 +44,65 @@
 #        key: https://rpms.remirepo.net/RPM-GPG-KEY-remi
 #      when: ansible_os_family == "RedHat"
 
-    - name: Download Remi repo RPM
+######Remi repo allalaadimine, paigaldamine ja seadistamine CentOS masinatel
+
+    - name: Laeme alla Remi repo
       get_url:
         url: "{{ remi_repo_url }}"
         dest: "/tmp/remi-release.rpm"
         mode: '0644'
       when: ansible_os_family == "RedHat"
 
-    - name: Install Remi repo RPM ignoring GPG check (temporary)
+    - name: Paigaldame Remi repo
       command: "dnf install -y /tmp/remi-release.rpm --nogpgcheck"
       when: ansible_os_family == "RedHat"
 
-
-    #CentOS repo seadistamine PHP 8.2 jaoks
-#    - name: Seadistame Remi repo CentOS masinatel
-#      dnf:
-#        name: "{{ remi_repo_url }}"
-#        state: present
-#      when: ansible_os_family == "RedHat"
-
     - name: Lubame PHP 8.2 mooduli CentOS masinatel
       command: dnf module enable php:remi-8.2 -y
-#      args:
-#        warn: false
       when: ansible_os_family == "RedHat"
 
-    #PHP 8.2 paigaldus mõlemal OS
+#####PHP 8.2 teenuse paigaldamine ja käivitamine
+
     - name: PHP teenuse paigaldamine
       package:
         name: "{{ php_packages[ansible_os_family] }}"
         state: present
 
-    #Käivitame PHP-FPM teenuse
     - name: Lubame ja käivitame PHP-FPM teenuse
       service:
         name: "{{ 'php8.2-fpm' if ansible_os_family == 'Debian' else 'php-fpm' }}"
         state: started
         enabled: true
 
+    - name: Teeme apache2/http teenusele restardi
+      service:
+        name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
+        state: restarted
+
+####################Iseseisev ülesanne1######################
+
+    - name: Loome phpinfo.php faili
+      copy:
+        dest: /var/www/html/phpinfo.php
+        content:
+          <html>
+            <body>
+              <?php
+                phpinfo();
+              ?>
+            </body>
+          </html>
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0644'
+
+    - name: Paigaldab Apache PHP lisamooduli Debiani masinatele
+      ansible.builtin.package:
+        name: libapache2-mod-php
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Teeme apache2/http teenusele restardi
+      service:
+        name: "{{ apache_deb if ansible_os_family == 'Debian' else apache_red }}"
+        state: restarted
