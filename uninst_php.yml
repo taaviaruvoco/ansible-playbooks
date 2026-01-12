@@ -1,0 +1,42 @@
+#PHP 8.2 teenuse kliendiserveritelt eemaldamise Ansible playbook.
+
+---
+- name: Eemaldame PHP teenuse Debiani ja CentOSi
+  hosts: webservers
+  become: true #kõik käsud jooksevad root õigustes
+
+  vars:
+    php_packages:
+      Debian:
+        - php8.2
+        - php8.2-cli
+        - php8.2-fpm
+      RedHat:
+        - php
+        - php-cli
+        - php-fpm
+    php_services:
+      Debian: php8.2-fpm
+      RedHat: php-fpm
+
+  tasks:
+
+    #Peatame ja keelame PHP teenuse
+    - name: Peatame ja keelame PHP teenuse
+      service:
+        name: "{{ php_services[ansible_os_family] }}"
+        state: stopped
+        enabled: false
+      ignore_errors: yes  # Kui teenus ei eksisteeri, jätkab playbook
+
+    #Eemaldame PHP paketid
+    - name: Eemaldame PHP paketid
+      package:
+        name: "{{ php_packages[ansible_os_family] }}"
+        state: absent
+
+    #Puhastame üleliigsed sõltuvused Debianil
+    - name: Eemaldame üleliigsed paketid Debian masinatelt
+      apt:
+        autoremove: yes
+      when: ansible_os_family == "Debian"
