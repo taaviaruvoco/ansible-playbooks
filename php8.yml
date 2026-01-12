@@ -1,0 +1,77 @@
+#PHP 8.2 teenuse kliendiserveritele paigaldamise Ansible playbook.
+
+---
+- name: PHP 8.2 teenuse paigaldamine Debian ja CentOS masinatele
+  hosts: webservers
+  become: true #kõik käsud jooksevad root õigustega
+
+  vars: #muutujad
+    php_packages:
+      Debian:
+        - php8.2
+        - php8.2-cli
+        - php8.2-fpm
+      RedHat:
+        - php
+        - php-cli
+        - php-fpm
+    remi_repo_url: "https://rpms.remirepo.net/enterprise/remi-release-9.rpm" #Remi repo aadress
+
+  tasks:
+    #Uuendame süsteemi kõigepealt
+    - name: Uuenda Debiani masinatel kõik pakettid
+      apt:
+        update_cache: yes
+        upgrade: dist
+      when: ansible_os_family == "Debian"
+
+    - name: Uuenda CentOS masinatel kõik pakettid
+      dnf:
+        name: '*'
+        state: latest
+      when: ansible_os_family == "RedHat"
+
+#    - name: Import Remi GPG key
+#      rpm_key:
+#        state: present
+#        key: https://rpms.remirepo.net/RPM-GPG-KEY-remi
+#      when: ansible_os_family == "RedHat"
+
+    - name: Download Remi repo RPM
+      get_url:
+        url: "{{ remi_repo_url }}"
+        dest: "/tmp/remi-release.rpm"
+        mode: '0644'
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Remi repo RPM ignoring GPG check (temporary)
+      command: "dnf install -y /tmp/remi-release.rpm --nogpgcheck"
+      when: ansible_os_family == "RedHat"
+
+
+    #CentOS repo seadistamine PHP 8.2 jaoks
+#    - name: Seadistame Remi repo CentOS masinatel
+#      dnf:
+#        name: "{{ remi_repo_url }}"
+#        state: present
+#      when: ansible_os_family == "RedHat"
+
+    - name: Lubame PHP 8.2 mooduli CentOS masinatel
+      command: dnf module enable php:remi-8.2 -y
+#      args:
+#        warn: false
+      when: ansible_os_family == "RedHat"
+
+    #PHP 8.2 paigaldus mõlemal OS
+    - name: PHP teenuse paigaldamine
+      package:
+        name: "{{ php_packages[ansible_os_family] }}"
+        state: present
+
+    #Käivitame PHP-FPM teenuse
+    - name: Lubame ja käivitame PHP-FPM teenuse
+      service:
+        name: "{{ 'php8.2-fpm' if ansible_os_family == 'Debian' else 'php-fpm' }}"
+        state: started
+        enabled: true
+
