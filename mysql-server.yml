@@ -1,0 +1,114 @@
+---
+- hosts: webservers
+  become: yes
+  vars:
+    download_dir: /root/allalaadimised # allalaadimise kausta muutuja
+    mysql_debian_package: mysql-apt-config_0.8.36-1_all.deb # Debianile sobiva paketi versioon
+    mysql_centos_package: mysql80-community-release-el9-1.noarch.rpm # CentOS 9 sobiv paketi versioon
+
+  tasks:
+
+####################Kliendiserverite info####################
+
+    - name: Kuvame kliendiserverite hostname'i, IP aadressi ja OSi
+      debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          IP-aadress: {{ ansible_default_ipv4.address }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+
+####################Kliendiserverite uuendamine##############
+
+#    - name: Uuendame Debian masinaid
+#      apt:
+#        update_cache: yes
+#        upgrade: dist
+#      when: ansible_os_family == "Debian" #vs ansible_distribution
+
+#    - name: Uuendame CentOS masinaid
+#      dnf:
+#        name: '*'
+#        state: latest
+#      when: ansible_os_family == "RedHat"
+
+#####Kataloogi loomine (töötab mõlemal)
+    - name: Loome allalaadimiseks kataloogi
+      file:
+        path: "{{ download_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+####DEBIAN SPETSIIFILISED SAMMUD
+    - name: (Debian) Installi gnupg ja vajalikud abivahendid
+      apt:
+        name:
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: (Debian) Laadime MySQL APT paketi wget abil
+      shell: |
+        wget -O {{ download_dir }}/{{ mysql_debian_package }} https://dev.mysql.com/get/{{ mysql_debian_package }}
+      when: ansible_os_family == "Debian"
+
+    - name: (Debian) Installi MySQL repositooriumi konfig failist
+      apt:
+        deb: "{{ download_dir }}/{{ mysql_debian_package }}"
+      when: ansible_os_family == "Debian"
+
+    - name: Teeme APT-le update
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Paigaldame mysql-server
+      apt:
+        name: mysql-server
+        state: present
+      when: ansible_os_family == "Debian"
+
+#####CENTOS SPETSIIFILISED SAMMUD
+    - name: (CentOS) Lae alla MySQL Yum repo pakk
+      shell: wget -O {{ download_dir }}/{{ mysql_centos_package }} https://dev.mysql.com/get/{{ mysql_centos_package }}
+      #args:
+        # See rida tagab, et kui fail on juba olemas, ei tõmmata seda uuesti
+        #creates: "{{ download_dir }}/{{ mysql_centos_package }}"
+      when: ansible_os_family == "RedHat"
+
+    - name: (CentOS) Lisa MySQL Yum repositoorium failist
+      yum:
+        name: "{{ download_dir }}/{{ mysql_centos_package }}"
+        state: present
+        disable_gpg_check: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: (CentOS) Impordi MySQL GPG võti
+      rpm_key:
+        state: present
+        key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+      when: ansible_os_family == "RedHat"
+
+    - name: (CentOS) Installi mysql-server
+      yum:
+        name: mysql-server
+        state: present
+      when: ansible_os_family == "RedHat"
+
+#####Teenuse käivitamine (mõlemal masinal)
+    - name: (Debian) Käivita MySQL teenus
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+      when: ansible_os_family == "Debian"
+
+    - name: (CentOS) Käivita MySQL teenus
+      service:
+        name: mysqld
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
