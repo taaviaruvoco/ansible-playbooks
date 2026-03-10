@@ -1,0 +1,68 @@
+---
+- name: MySQL-i täielik eemaldamine (Debian ja CentOS)
+  hosts: webservers
+  become: yes
+  tasks:
+
+    #######################################################
+    # 1. PEATA TEENUSED
+    #######################################################
+    - name: Peata MySQL teenus, kui see jookseb
+      service:
+        name: "{{ 'mysql' if ansible_os_family == 'Debian' else 'mysqld' }}"
+        state: stopped
+      ignore_errors: yes # Kui teenust polegi, siis playbook ei katke
+
+    #######################################################
+    # 2. DEBIANI EEMALDAMINE (Põhineb sinu käskudel)
+    #######################################################
+    - name: (Debian) Eemalda paketid koos konfigiga (purge)
+      apt:
+        name:
+          - mysql-server
+          - mysql-client
+          - mysql-common
+          - mysql-apt-config
+        state: absent
+        purge: yes
+      when: ansible_os_family == "Debian"
+
+    - name: (Debian) Autoremove ja Autoclean
+      apt:
+        autoremove: yes
+        autoclean: yes
+      when: ansible_os_family == "Debian"
+
+    #######################################################
+    # 3. CENTOS-I EEMALDAMINE
+    #######################################################
+    - name: (CentOS) Eemalda MySQL paketid
+      dnf: # Või yum, olenevalt CentOS versioonist
+        name:
+          - mysql-community-server
+          - mysql-community-client
+          - mysql-community-common
+          - mysql-community-release
+        state: absent
+      when: ansible_os_family == "RedHat"
+
+    #######################################################
+    # 4. FAILIDE JA KATALOOGIDE KUSTUTAMINE
+    #######################################################
+    - name: Kustuta andmete ja konfigu kataloogid ning .my.cnf
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/mysql
+        - /etc/mysql
+        - /etc/my.cnf
+        - /root/.my.cnf
+        - /root/allalaadimised  # Sinu eelmises skriptis loodud kaust
+
+    #######################################################
+    # 5. TAASKÄIVITUS (Sinu käsk: #reboot)
+    #######################################################
+    - name: Taaskäivita server, et puhastada mälust kõik jäägid
+      reboot:
+        msg: "Ansible puhastus skript nõuab taaskäivitust"

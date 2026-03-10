@@ -1,0 +1,18 @@
+#Debiani puhastamine
+systemctl stop apache2
+systemctl disable apache2
+apt remove apache2
+apt purge apache2 apache2-bin apache2-utils apache2-data
+apt autoremove --purge
+rm -rf /var/www/
+rm -rf /etc/apache2/
+dpkg -l | grep apache2
+systemctl status apache2
+
+#CentOSi puhastamine
+systemctl stop httpd
+systemctl disable httpd
+dnf remove httpd
+rm -rf /etc/httpd/
+rm -rf /var/www/
+systemctl status httpd
